@@ -100,7 +100,21 @@ struct NotRegistered { };
 template <class Code>
 inline constexpr auto registered_domain = NotRegistered { };
 
+// Expands to the registered_domain specialization. Must be used at global scope.
+// NOLINTBEGIN(cppcoreguidelines-macro-usage)
+// clang-format off
+#define ERR_REGISTER_DOMAIN(domain_name, domain_entries)                           \
+    template <> inline constexpr auto                                              \
+    ::err::registered_domain<::err::detail::code_of<decltype((domain_entries))>> = \
+        ::err::Domain { .name = (domain_name), .entries = (domain_entries) }
+// clang-format on
+// NOLINTEND(cppcoreguidelines-macro-usage)
+
 namespace detail {
+
+// The Code of an error list, e.g. Code for std::array<Entry<Code>, N>. Used by ERR_REGISTER_DOMAIN.
+template <class Entries>
+using code_of = decltype(std::declval<Entries>()[0].code);
 
 template <class Domain, class Code>
 inline constexpr bool is_domain_of = false;

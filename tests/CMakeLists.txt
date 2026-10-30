@@ -7,7 +7,7 @@ FetchContent_Declare(Catch2
 )
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(errors_test domain_test.cpp)
+add_executable(errors_test domain_test.cpp error_test.cpp)
 target_link_libraries(errors_test PRIVATE errors::errors Catch2::Catch2WithMain)
 target_compile_options(errors_test PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
@@ -28,3 +28,4 @@ endfunction()
 
 add_compile_fail_test(duplicate_code error_code_must_be_unique)
 add_compile_fail_test(zero_code error_code_must_not_be_zero)
+add_compile_fail_test(runtime_string_view_context "consteval function.*err::StaticString")

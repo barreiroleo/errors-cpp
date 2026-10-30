@@ -23,7 +23,23 @@ constexpr auto entries(Sample first, Sample second) -> std::array<err::Entry<Sam
         { .code = second, .msg = "" },
     });
 }
+
+namespace shipping {
+enum class Code : std::uint8_t {
+    Delayed = 1,
+};
+
+constexpr auto errors = err::error_list<Code>({
+    { .code = Code::Delayed, .msg = "Shipment delayed" },
+});
+} // namespace shipping
 } // namespace
+
+ERR_REGISTER_DOMAIN("shipping", shipping::errors);
+
+static_assert(err::RegisteredCode<shipping::Code>);
+static_assert(err::registered_domain<shipping::Code>.message(shipping::Code::Delayed) ==
+              "Shipment delayed");
 
 static_assert(!err::detail::has_zero_code(entries(Sample::A, Sample::B)));
 static_assert(err::detail::has_zero_code(entries(Sample::Zero, Sample::A)));
