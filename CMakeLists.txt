@@ -22,7 +22,5 @@ endif()
 
 if(ERRORS_BUILD_TESTS)
     enable_testing()
-    # add_executable(errors_test)
-    # target_link_libraries(errors_test PRIVATE errors::errors)
-    # add_test(NAME errors_test COMMAND errors_test)
+    add_subdirectory(tests)
 endif()
