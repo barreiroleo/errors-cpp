@@ -174,6 +174,10 @@ auto place_order() -> err::Result<void>
 }
 ```
 
+## Example
+
+[`examples/layered`](examples/layered) puts it all together in a three-layer application.
+
 ## Building the tests
 
 ```sh

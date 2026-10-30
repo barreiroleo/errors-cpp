@@ -17,7 +17,7 @@ option(ERRORS_BUILD_EXAMPLES "Build the error-handling examples" ${PROJECT_IS_TO
 option(ERRORS_BUILD_TESTS "Build the error-handling tests" ${PROJECT_IS_TOP_LEVEL})
 
 if(ERRORS_BUILD_EXAMPLES)
-    # add_subdirectory(examples)
+    add_subdirectory(examples)
 endif()
 
 if(ERRORS_BUILD_TESTS)
