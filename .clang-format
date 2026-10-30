@@ -1,0 +1,59 @@
+---
+# Base style
+Language:     Cpp
+BasedOnStyle: Webkit
+ColumnLimit:  100
+IndentWidth:  4
+TabWidth:     4
+
+# Indentation
+UseTab:       Never
+IndentPPDirectives: BeforeHash
+NamespaceIndentation: None
+
+# Alignment
+AlignAfterOpenBracket:  Align
+AlignArrayOfStructures: Left
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+AlignOperands: Align
+
+# Wrapping and packing
+BreakBeforeBinaryOperators: None
+BreakTemplateDeclarations: Leave
+PackConstructorInitializers: NextLine
+BinPackParameters: BinPack                  # TODO: Switch to PackParameters on clang-format 23
+PenaltyBreakBeforeMemberAccess: 1
+# PenaltyBreakAssignment: 100
+# PenaltyBreakBeforeMemberAccess: 100
+
+# Braces
+BreakBeforeBraces:         Custom
+BraceWrapping:
+  AfterClass:            false
+  AfterStruct:           false
+  AfterUnion:            false
+  AfterFunction:         true
+  BeforeCatch:           true
+  BeforeElse:            true
+  BeforeLambdaBody:      false
+  BeforeWhile:           false
+  SplitEmptyFunction:    false
+  SplitEmptyRecord:      false
+  SplitEmptyNamespace:   false
+
+# Short constructs
+AllowShortFunctionsOnASingleLine:           Inline
+AllowShortRecordOnASingleLine:              Empty
+
+AllowShortCaseExpressionOnASingleLine:      true
+AllowShortCaseLabelsOnASingleLine:          true
+
+# Includes
+SortIncludes:         CaseInsensitive
+
+# Automatic edits
+FixNamespaceComments: true # Namespace comment after closing brace
+InsertBraces:         true # Insert braces arround if, for, etc
+EnumTrailingComma: Insert
