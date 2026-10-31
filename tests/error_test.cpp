@@ -27,7 +27,7 @@ auto validate_order() -> err::Result<void>
 {
     auto stock = available_units();
     if (!stock) {
-        return err::fail(stock.error());
+        return err::forward(stock.error());
     }
     return { };
 }
@@ -96,14 +96,14 @@ TEST_CASE("Changing the context")
 {
     const auto error = err::Error<FooCtx> { inventory::Code::NotFound, FooCtx { .a = 1 } };
 
-    const err::Result<void> without = err::fail(error.code());
+    const err::Result<void> without = err::forward(error, err::no_context);
     CHECK(without.error() == inventory::Code::NotFound);
     CHECK(without.error().ctx()->empty());
 
-    const err::Result<void> with = err::fail(error.code(), "while validating");
+    const err::Result<void> with = err::forward(error, "while validating");
     CHECK(with.error().to_string() == "[inventory:1] Product not found: while validating");
 
-    const err::Result<void, std::string> owned = err::fail(error.code(), std::string { "owned" });
+    const err::Result<void, std::string> owned = err::forward(error, std::string { "owned" });
     CHECK(owned.error().to_string() == "[inventory:1] Product not found: owned");
 }
 
@@ -112,7 +112,7 @@ TEST_CASE("Flattening the context")
     const auto error = err::Error<Described> { inventory::Code::NotFound,
                                                Described { .text = "described" } };
 
-    const err::Result<void, std::string> flat = err::fail(error.code(), error.ctx().flat());
+    const err::Result<void, std::string> flat = err::forward(error, error.ctx().flat());
     CHECK(*flat.error().ctx() == "described");
 }
 

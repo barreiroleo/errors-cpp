@@ -1,7 +1,8 @@
 #pragma once
 
 // Errors and results: Error pairs a std::error_code with an optional context, Result is a
-// std::expected of it, and fail() builds the value a function returns on failure.
+// std::expected of it. fail() builds the value a function returns on failure, and forward()
+// propagates an existing error.
 
 #include <errors/domain.hpp>
 
@@ -22,6 +23,9 @@ namespace err {
 // ------------------------------------------------------------------------------------------------
 
 struct NoContext { };
+
+// Drops an error's context: forward(error, no_context).
+inline constexpr NoContext no_context { };
 
 // A string in static storage. The consteval constructor only accepts constant expressions, so a
 // view of a runtime buffer (e.g. a std::string) does not compile.
@@ -111,7 +115,7 @@ private:
 
 // ------------------------------------------------------------------------------------------------
 // Error: an error code and its context. Errors with different contexts don't convert into each
-// other, except from NoContext; use fail(error.code(), ...) to change it.
+// other, except from NoContext; use forward(error, ctx) to change it.
 // ------------------------------------------------------------------------------------------------
 
 template <detail::Context Ctx = std::string_view>
@@ -161,15 +165,14 @@ private:
 };
 
 // ------------------------------------------------------------------------------------------------
-// Result and fail(): fail() deduces the context type from its argument. String literals and other
-// non-owning strings become std::string_view; anything else is stored by value.
+// Result, fail() and forward(): both deduce the context type from their argument. String literals
+// and other non-owning strings become std::string_view; anything else is stored by value.
 // ------------------------------------------------------------------------------------------------
 
 template <class T, class Ctx = std::string_view>
 using Result = std::expected<T, Error<Ctx>>;
 
-// Taking a std::error_code lets a layer change an error's context while keeping its code, e.g.
-// fail(error.code()) drops the context and fail(error.code(), ctx) replaces it.
+// Taking a std::error_code wraps codes from outside the registered domains, e.g. std::errc.
 inline auto fail(std::error_code code) -> std::unexpected<Error<NoContext>>
 {
     return std::unexpected(Error<NoContext> { code });
@@ -209,9 +212,24 @@ auto fail(Code code, Ctx&& ctx) -> std::unexpected<Error<std::decay_t<Ctx>>>
 
 // Propagates an error unchanged: only to a Result with the same context type.
 template <class Ctx>
-auto fail(Error<Ctx> error) -> std::unexpected<Error<Ctx>>
+auto forward(Error<Ctx> error) -> std::unexpected<Error<Ctx>>
 {
     return std::unexpected(std::move(error));
+}
+
+// Propagates an error's code with a new context, replacing the original one. Pass no_context to
+// drop it.
+template <class From>
+auto forward(const Error<From>& error, StaticString ctx) -> std::unexpected<Error<std::string_view>>
+{
+    return fail(error.code(), ctx);
+}
+
+template <class From, class Ctx>
+    requires(!detail::StringReference<Ctx>)
+auto forward(const Error<From>& error, Ctx&& ctx) -> std::unexpected<Error<std::decay_t<Ctx>>>
+{
+    return fail(error.code(), std::forward<Ctx>(ctx));
 }
 
 } // namespace err

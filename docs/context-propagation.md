@@ -23,8 +23,8 @@ A layer B that consumes `reserve()` can only propagate the error as-is if it ret
 context type. Otherwise it must choose what to do with the context; an error with a different
 context doesn't compile.
 
-To change the context, pass the error's code to `fail()` with the new context, or none. The code,
-and so its domain in `to_string()`, is kept.
+`forward()` propagates an error. With a second argument, it replaces the context; pass
+`err::no_context` to drop it. Either way the code, and so its domain in `to_string()`, is kept.
 
 ## B knows A's context
 
@@ -34,7 +34,7 @@ B can propagate it unchanged:
 auto place_order() -> err::Result<void, StockCtx>
 {
     if (auto reserved = reserve(5); !reserved) {
-        return err::fail(reserved.error());
+        return err::forward(reserved.error());
     }
     return {};
 }
@@ -52,7 +52,7 @@ auto place_order() -> err::Result<void, OrderCtx>
     if (auto reserved = reserve(5); !reserved) {
         const auto& error = reserved.error();
         const auto& stock = *error.ctx();
-        return err::fail(error.code(), OrderCtx { .missing = stock.requested - stock.available });
+        return err::forward(error, OrderCtx { .missing = stock.requested - stock.available });
     }
     return {};
 }
@@ -66,7 +66,7 @@ B can drop it:
 auto place_order() -> err::Result<void>
 {
     if (auto reserved = reserve(5); !reserved) {
-        return err::fail(reserved.error().code());
+        return err::forward(reserved.error(), err::no_context);
     }
     return {};
 }
@@ -78,7 +78,7 @@ Or replace it:
 auto place_order() -> err::Result<void>
 {
     if (auto reserved = reserve(5); !reserved) {
-        return err::fail(reserved.error().code(), "while placing the order");
+        return err::forward(reserved.error(), "while placing the order");
     }
     return {};
 }
@@ -92,7 +92,7 @@ auto place_order() -> err::Result<void, std::string>
 {
     if (auto reserved = reserve(5); !reserved) {
         const auto& error = reserved.error();
-        return err::fail(error.code(), error.ctx().flat()); // "requested 5, available 3"
+        return err::forward(error, error.ctx().flat()); // "requested 5, available 3"
     }
     return {};
 }

@@ -74,7 +74,7 @@ auto validate_order() -> err::Result<void>
         if (stock.error() == inventory::Code::NotFound) {
             // A layer can handle or translate an error it knows.
         }
-        return err::fail(stock.error()); // Propagate any error unchanged.
+        return err::forward(stock.error()); // Propagate any error unchanged.
     }
 
     if (auto reserved = reserved_units(); !reserved) {
@@ -109,6 +109,13 @@ logger.error(unknown.to_string());
 A layer can propagate an error as-is only to a `Result` with the same context type. Otherwise it
 converts, drops, replaces or flattens the context; see [Propagating context between
 layers](docs/context-propagation.md).
+
+| Intent                         | Call                                       |
+|--------------------------------|--------------------------------------------|
+| Create an error                | `err::fail(code)` / `err::fail(code, ctx)` |
+| Propagate unchanged            | `err::forward(error)`                      |
+| Propagate with another context | `err::forward(error, ctx)`                 |
+| Propagate without context      | `err::forward(error, err::no_context)`     |
 
 ## Example
 

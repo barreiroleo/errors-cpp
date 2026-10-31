@@ -21,7 +21,7 @@ auto reserve(std::string_view product, int units) -> err::Result<void, std::stri
         }
 
         // Any other error: propagate it, flattening the context to this layer's std::string.
-        return err::fail(error.code(), error.ctx().flat());
+        return err::forward(error, error.ctx().flat());
     }
 
     if (*stock < units) {
