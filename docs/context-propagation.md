@@ -6,6 +6,11 @@ A lower layer A returns errors with its own context:
 struct StockCtx {
     int requested;
     int available;
+
+    [[nodiscard]] auto to_string() const -> std::string
+    {
+        return std::format("requested {}, available {}", requested, available);
+    }
 };
 
 auto reserve(int units) -> err::Result<void, StockCtx>
@@ -17,6 +22,9 @@ auto reserve(int units) -> err::Result<void, StockCtx>
 A layer B that consumes `reserve()` can only propagate the error as-is if it returns the same
 context type. Otherwise it must choose what to do with the context; an error with a different
 context doesn't compile.
+
+To change the context, pass the error's code to `fail()` with the new context, or none. The code,
+and so its domain in `to_string()`, is kept.
 
 ## B knows A's context
 
@@ -35,12 +43,16 @@ auto place_order() -> err::Result<void, StockCtx>
 Or convert it to its own context:
 
 ```cpp
-auto place_order() -> err::Result<void, std::string>
+struct OrderCtx {
+    int missing;
+};
+
+auto place_order() -> err::Result<void, OrderCtx>
 {
     if (auto reserved = reserve(5); !reserved) {
-        const auto& stock = reserved.error().context();
-        return err::fail(reserved.error().with_context(
-            std::format("requested {}, available {}", stock.requested, stock.available)));
+        const auto& error = reserved.error();
+        const auto& stock = *error.ctx();
+        return err::fail(error.code(), OrderCtx { .missing = stock.requested - stock.available });
     }
     return {};
 }
@@ -54,7 +66,7 @@ B can drop it:
 auto place_order() -> err::Result<void>
 {
     if (auto reserved = reserve(5); !reserved) {
-        return err::fail(reserved.error().without_context());
+        return err::fail(reserved.error().code());
     }
     return {};
 }
@@ -66,7 +78,21 @@ Or replace it:
 auto place_order() -> err::Result<void>
 {
     if (auto reserved = reserve(5); !reserved) {
-        return err::fail(reserved.error().with_context("while placing the order"));
+        return err::fail(reserved.error().code(), "while placing the order");
+    }
+    return {};
+}
+```
+
+Or flatten it to a `std::string`, if it has a `to_string()` member or supports `std::format`.
+Otherwise `ctx().flat()` doesn't compile:
+
+```cpp
+auto place_order() -> err::Result<void, std::string>
+{
+    if (auto reserved = reserve(5); !reserved) {
+        const auto& error = reserved.error();
+        return err::fail(error.code(), error.ctx().flat()); // "requested 5, available 3"
     }
     return {};
 }

@@ -78,7 +78,7 @@ auto validate_order() -> err::Result<void>
     }
 
     if (auto reserved = reserved_units(); !reserved) {
-        const FooCtx& ctx = reserved.error().context(); // Read the context.
+        const FooCtx& ctx = *reserved.error().ctx(); // Read the context.
         // ...
     }
 
@@ -107,7 +107,7 @@ logger.error(unknown.to_string());
 ### Propagating context between layers
 
 A layer can propagate an error as-is only to a `Result` with the same context type. Otherwise it
-converts, drops or replaces the context; see [Propagating context between
+converts, drops, replaces or flattens the context; see [Propagating context between
 layers](docs/context-propagation.md).
 
 ## Example

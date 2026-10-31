@@ -45,7 +45,7 @@ private:
 
 namespace detail {
 
-// Non-owning strings: fail() and with_context() store them as std::string_view, via StaticString.
+// Non-owning strings: fail() stores them as std::string_view, via StaticString.
 template <class T>
 concept StringReference =
     std::same_as<std::decay_t<T>, std::string_view> ||
@@ -62,13 +62,19 @@ concept Context =
 template <class Ctx>
 using ContextArg = std::conditional_t<std::same_as<Ctx, std::string_view>, StaticString, Ctx>;
 
+template <class Ctx>
+concept HasToString = requires(const Ctx& ctx) {
+    { ctx.to_string() } -> std::convertible_to<std::string>;
+};
+
+template <class Ctx>
+concept FormattableContext = HasToString<Ctx> || std::formattable<Ctx, char>;
+
 // Returns an empty string if the context can't be formatted.
 template <class Ctx>
 auto context_to_string(const Ctx& ctx) -> std::string
 {
-    if constexpr (requires {
-                      { ctx.to_string() } -> std::convertible_to<std::string>;
-                  }) {
+    if constexpr (HasToString<Ctx>) {
         return ctx.to_string();
     }
     else if constexpr (std::formattable<Ctx, char>) {
@@ -82,8 +88,30 @@ auto context_to_string(const Ctx& ctx) -> std::string
 } // namespace detail
 
 // ------------------------------------------------------------------------------------------------
+// ContextHandle: an error's context, returned by Error::ctx().
+// ------------------------------------------------------------------------------------------------
+
+template <detail::Context Ctx>
+class ContextHandle {
+public:
+    explicit ContextHandle(detail::ContextArg<Ctx> ctx = { }) : ctx_ { std::move(ctx) } { }
+
+    [[nodiscard]] auto operator->() const -> const Ctx* { return &ctx_; }
+    [[nodiscard]] auto operator*() const -> const Ctx& { return ctx_; }
+
+    [[nodiscard]] auto flat() const -> std::string
+        requires detail::FormattableContext<Ctx>
+    {
+        return detail::context_to_string(ctx_);
+    }
+
+private:
+    Ctx ctx_;
+};
+
+// ------------------------------------------------------------------------------------------------
 // Error: an error code and its context. Errors with different contexts don't convert into each
-// other, except from NoContext; use with_context() or without_context() to change it.
+// other, except from NoContext; use fail(error.code(), ...) to change it.
 // ------------------------------------------------------------------------------------------------
 
 template <detail::Context Ctx = std::string_view>
@@ -107,7 +135,7 @@ public:
     { }
 
     [[nodiscard]] auto code() const -> std::error_code { return code_; }
-    [[nodiscard]] auto context() const -> const Ctx& { return ctx_; }
+    [[nodiscard]] auto ctx() const -> const ContextHandle<Ctx>& { return ctx_; }
     [[nodiscard]] auto message() const -> std::string { return code_.message(); }
 
     // "[domain:value] message: context". The context is omitted if it can't be formatted (see
@@ -115,8 +143,8 @@ public:
     [[nodiscard]] auto to_string() const -> std::string
     {
         auto text = std::format("[{}:{}] {}", code_.category().name(), code_.value(), message());
-        if (const auto ctx = detail::context_to_string(ctx_); !ctx.empty()) {
-            text += ": " + ctx;
+        if (const auto ctx_text = detail::context_to_string(*ctx_); !ctx_text.empty()) {
+            text += ": " + ctx_text;
         }
         return text;
     }
@@ -127,26 +155,9 @@ public:
         return code_ == make_error_code(code);
     }
 
-    template <class NewCtx>
-        requires(!detail::StringReference<NewCtx>)
-    [[nodiscard]] auto with_context(NewCtx&& ctx) const -> Error<std::decay_t<NewCtx>>
-    {
-        return Error<std::decay_t<NewCtx>> { code_, std::forward<NewCtx>(ctx) };
-    }
-
-    [[nodiscard]] auto with_context(StaticString ctx) const -> Error<std::string_view>
-    {
-        return Error<std::string_view> { code_, ctx };
-    }
-
-    [[nodiscard]] auto without_context() const -> Error<NoContext>
-    {
-        return Error<NoContext> { code_ };
-    }
-
 private:
     std::error_code code_;
-    [[no_unique_address]] Ctx ctx_ { };
+    [[no_unique_address]] ContextHandle<Ctx> ctx_;
 };
 
 // ------------------------------------------------------------------------------------------------
@@ -157,25 +168,46 @@ private:
 template <class T, class Ctx = std::string_view>
 using Result = std::expected<T, Error<Ctx>>;
 
+// Taking a std::error_code lets a layer change an error's context while keeping its code, e.g.
+// fail(error.code()) drops the context and fail(error.code(), ctx) replaces it.
+inline auto fail(std::error_code code) -> std::unexpected<Error<NoContext>>
+{
+    return std::unexpected(Error<NoContext> { code });
+}
+
+inline auto fail(std::error_code code, StaticString ctx)
+    -> std::unexpected<Error<std::string_view>>
+{
+    return std::unexpected(Error<std::string_view> { code, ctx });
+}
+
+template <class Ctx>
+    requires(!detail::StringReference<Ctx>)
+auto fail(std::error_code code, Ctx&& ctx) -> std::unexpected<Error<std::decay_t<Ctx>>>
+{
+    return std::unexpected(Error<std::decay_t<Ctx>> { code, std::forward<Ctx>(ctx) });
+}
+
 template <RegisteredCode Code>
 auto fail(Code code) -> std::unexpected<Error<NoContext>>
 {
-    return std::unexpected(Error<NoContext> { code });
+    return fail(make_error_code(code));
 }
 
 template <RegisteredCode Code>
 auto fail(Code code, StaticString ctx) -> std::unexpected<Error<std::string_view>>
 {
-    return std::unexpected(Error<std::string_view> { code, ctx });
+    return fail(make_error_code(code), ctx);
 }
 
 template <RegisteredCode Code, class Ctx>
     requires(!detail::StringReference<Ctx>)
 auto fail(Code code, Ctx&& ctx) -> std::unexpected<Error<std::decay_t<Ctx>>>
 {
-    return std::unexpected(Error<std::decay_t<Ctx>> { code, std::forward<Ctx>(ctx) });
+    return fail(make_error_code(code), std::forward<Ctx>(ctx));
 }
 
+// Propagates an error unchanged: only to a Result with the same context type.
 template <class Ctx>
 auto fail(Error<Ctx> error) -> std::unexpected<Error<Ctx>>
 {

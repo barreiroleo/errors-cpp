@@ -17,7 +17,7 @@ void place_order(std::string_view product, int units)
 
     // A known error: handle it.
     if (reserved.error() == inventory::Code::OutOfStock) {
-        std::println("{} x{}: back-ordered ({})", product, units, reserved.error().context());
+        std::println("{} x{}: back-ordered ({})", product, units, *reserved.error().ctx());
         return;
     }
 

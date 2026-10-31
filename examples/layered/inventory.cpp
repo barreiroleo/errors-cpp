@@ -20,8 +20,8 @@ auto reserve(std::string_view product, int units) -> err::Result<void, std::stri
             return err::fail(Code::NotFound, std::string { product });
         }
 
-        // Any other error: propagate it, converting the context to this layer's type.
-        return err::fail(error.with_context(error.context().to_string()));
+        // Any other error: propagate it, flattening the context to this layer's std::string.
+        return err::fail(error.code(), error.ctx().flat());
     }
 
     if (*stock < units) {

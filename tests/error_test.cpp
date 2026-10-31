@@ -67,7 +67,7 @@ TEST_CASE("String literal context")
     const auto error = err::fail(inventory::Code::OutOfStock, "Some optional context").error();
 
     STATIC_CHECK(std::is_same_v<decltype(error), const err::Error<std::string_view>>);
-    CHECK(error.context() == "Some optional context");
+    CHECK(*error.ctx() == "Some optional context");
     CHECK(error.to_string() == "[inventory:2] Not enough stock: Some optional context");
 }
 
@@ -87,7 +87,7 @@ TEST_CASE("Context formatting")
     SECTION("not formattable")
     {
         const auto error = err::fail(inventory::Code::NotFound, FooCtx { .a = 1, .b = -3 }).error();
-        CHECK(error.context().a == 1);
+        CHECK(error.ctx()->a == 1);
         CHECK(error.to_string() == "[inventory:1] Product not found");
     }
 }
@@ -96,12 +96,24 @@ TEST_CASE("Changing the context")
 {
     const auto error = err::Error<FooCtx> { inventory::Code::NotFound, FooCtx { .a = 1 } };
 
-    const err::Result<void> without = err::fail(error.without_context());
+    const err::Result<void> without = err::fail(error.code());
     CHECK(without.error() == inventory::Code::NotFound);
-    CHECK(without.error().context().empty());
+    CHECK(without.error().ctx()->empty());
 
-    const err::Result<void> with = err::fail(error.with_context("while validating"));
+    const err::Result<void> with = err::fail(error.code(), "while validating");
     CHECK(with.error().to_string() == "[inventory:1] Product not found: while validating");
+
+    const err::Result<void, std::string> owned = err::fail(error.code(), std::string { "owned" });
+    CHECK(owned.error().to_string() == "[inventory:1] Product not found: owned");
+}
+
+TEST_CASE("Flattening the context")
+{
+    const auto error = err::Error<Described> { inventory::Code::NotFound,
+                                               Described { .text = "described" } };
+
+    const err::Result<void, std::string> flat = err::fail(error.code(), error.ctx().flat());
+    CHECK(*flat.error().ctx() == "described");
 }
 
 TEST_CASE("Wrapping a std::error_code")
